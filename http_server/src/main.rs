@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 
 use poem::{listener::TcpListener, Route};
-use poem_openapi::{
-    payload::Json, ApiResponse, Object, OpenApi, OpenApiService,
-};
+use poem_openapi::{payload::Json, ApiResponse, Object, OpenApi, OpenApiService};
 use redis::RedisError;
 use slab::Slab;
 use tokio::sync::Mutex;
@@ -24,7 +22,6 @@ struct Job {
     #[oai(read_only)]
     status: String,
 }
-
 
 #[derive(Debug, Object, Clone, Eq, PartialEq)]
 struct UpdateJob {
@@ -97,7 +94,7 @@ impl Api {
         job.status = String::from("RUNNING");
 
         // Save jobs into slab. It is a demo so if use RDB is too big.
-        // It can also changed to save a record in RDB such as MySQL.  
+        // It can also changed to save a record in RDB such as MySQL.
         let mut jobs = self.jobs.lock().await;
         let idx = jobs.insert(job.clone()) as i64;
 
@@ -113,10 +110,7 @@ impl Api {
     // 接口接收 1 个参数：任务ID【 uuid 】
     // 通过 任务ID 到 Redis 中的 HSET 查找，如果找到返回任务信息，否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "get")]
-    async fn index(
-        &self,
-        #[oai(name = "job_id", in = "path")] job_id: String,
-    ) -> FindJobResponse {
+    async fn index(&self, #[oai(name = "job_id", in = "path")] job_id: String) -> FindJobResponse {
         match redis_hset_query(&job_id).await {
             Ok((job, slab_idx)) => FindJobResponse::Ok(Json(job.clone())),
             Err(_) => FindJobResponse::NotFound,
@@ -147,10 +141,9 @@ impl Api {
                 } else {
                     DeleteJobResponse::NotFound
                 }
-            },
+            }
             Err(_) => DeleteJobResponse::NotFound,
         }
-
 
         // match self.index(job_id.clone()).await {
         //     FindJobResponse::Ok(_) => {
@@ -175,11 +168,9 @@ impl Api {
     ) -> UpdateJobResponse {
         match redis_hset_query(&job_id).await {
             Ok((job, slab_idx)) => {
-                
                 let mut jobs = self.jobs.lock().await;
                 match jobs.get_mut(slab_idx as usize) {
                     Some(slab_job) => {
-                        
                         let mut job = job;
                         if let Some(content) = update.0.content {
                             job.content = content.clone();
@@ -188,7 +179,6 @@ impl Api {
                         if let Some(schedule_type) = update.0.schedule_type {
                             job.schedule_type = schedule_type.clone();
                             slab_job.schedule_type = schedule_type;
-
                         }
                         if let Some(duration) = update.0.duration {
                             job.duration = duration;
@@ -196,13 +186,13 @@ impl Api {
                         }
                         let _ = redis_update(&job, "running-list", slab_idx).await;
                         UpdateJobResponse::Ok
-                    },
+                    }
                     None => UpdateJobResponse::NotFound,
                 }
                 // } else {
                 //     UpdateJobResponse::NotFound
                 // }
-            },
+            }
             Err(_) => UpdateJobResponse::NotFound,
         }
     }
@@ -228,10 +218,9 @@ async fn redis_hset_query(job_id: &str) -> redis::RedisResult<(Job, i64)> {
             };
             let slab_idx = res.get("slab_idx").unwrap().parse::<i64>().unwrap();
             Ok((job, slab_idx))
-        },
+        }
         Err(error) => Err(error),
     }
-    
 }
 
 async fn redis_add_task(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {

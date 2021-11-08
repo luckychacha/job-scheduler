@@ -4,7 +4,6 @@ use chrono::Local;
 use tokio::time;
 
 async fn async_main() {
-
     // 创建一个永远不会结束的任务，保证 Scheduler 会一直运行。
     let start = tokio::spawn(async move {
         println!("Start");
@@ -100,7 +99,13 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
             if "OneShot" == schedule_type {
                 time::sleep(Duration::from_secs(duration)).await;
                 if !check_is_need_to_stop(&id).await {
-                    println!("  ****  id: {}, content: {}, type: {} now is {}  ****  ", id, content, schedule_type, now());
+                    println!(
+                        "  ****  id: {}, content: {}, type: {} now is {}  ****  ",
+                        id,
+                        content,
+                        schedule_type,
+                        now()
+                    );
                 }
                 // stop_task(&id);
             } else if "Repeated" == schedule_type {
@@ -111,7 +116,13 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
                         break;
                     }
                     async {
-                        println!("  ****  id: {}, content: {}, type: {}, now is {}  ****  ", id, content, schedule_type, now());
+                        println!(
+                            "  ****  id: {}, content: {}, type: {}, now is {}  ****  ",
+                            id,
+                            content,
+                            schedule_type,
+                            now()
+                        );
                     }
                     .await;
                 }
@@ -157,7 +168,10 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
         if "update" == &schedule_type {
             let (_, content, schedule_type, sec, slab_idx) = parser_task(content);
 
-            let new_job = format!("{}::{}::{}::{}::{}", update_id, content, schedule_type, sec, slab_idx);
+            let new_job = format!(
+                "{}::{}::{}::{}::{}",
+                update_id, content, schedule_type, sec, slab_idx
+            );
 
             let _ = redis::cmd("RPUSH")
                 .arg(&["todo-list", &new_job])
@@ -173,11 +187,11 @@ async fn stop_task(id: &str) -> redis::RedisResult<()> {
     let mut con = client.get_async_connection().await?;
 
     let _ = redis::cmd("HSET")
-    .arg(&id)
-    .arg("status")
-    .arg("STOPPED")
-    .query_async(&mut con)
-    .await?;
+        .arg(&id)
+        .arg("status")
+        .arg("STOPPED")
+        .query_async(&mut con)
+        .await?;
 
     Ok(())
 }
