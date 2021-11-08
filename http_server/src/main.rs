@@ -127,7 +127,7 @@ impl Api {
     // 接口接收 1 个参数：任务ID【 uuid 】
     // 通过 任务ID 到 Redis 中的 HSET 查找，
     // 如果找到，就把从 hset 中拿到 slab_idx，根据 slab_id 移除元素，用于模拟数据库的删除操作【物理删除或者逻辑删除】
-    // slab 处理完成后，将数据按照 job_id|delete 的格式写入 RunningList
+    // slab 处理完成后，将数据按照 job_id|delete 的格式写入 Running-List
     // 否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "delete")]
     async fn delete_job(
@@ -165,7 +165,7 @@ impl Api {
     // 接口接收 1 个参数：任务ID【 uuid 】，和一个 PUT 传递过来的包含任务内容，任务类型，任务时间三个参数组成的 UpdateJob 对象。
     // 通过 任务ID 到 Redis 中的 HSET 查找，
     // 如果找到，就把从 hset 中拿到 slab_idx，根据 slab_id 从更新元素，用于模拟数据库的更新操作
-    // slab 处理完成后，将数据按照 job_id|update|id::content::schedule_type::duration::idx 的格式写入 RunningList
+    // slab 处理完成后，将数据按照 job_id|update|id::content::schedule_type::duration::idx 的格式写入 Running-List
     // 否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "put")]
     async fn put_job(
