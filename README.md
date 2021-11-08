@@ -58,7 +58,7 @@
 > 
 > 5. start HTTP Server: `nohup target/x86_64-unknown-linux-gnu/release/http_server &`
 > 
-> 6. open another terminal and repeat step 1,3 and start Schedule: `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this ![scheduler-running-log-describe](./scheduler-running-log-describe.png).
+> 6. open another terminal and repeat step 1,3 and start Schedule: `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this. ![scheduler-running-log-describe](./scheduler-running-log-describe.png)
 > 
 > 7. check if HTTP Server and Scheduler are started: `ps -ef|grep release`, if you see the output like this, deploy is finished.
 >
