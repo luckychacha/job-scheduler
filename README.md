@@ -1,8 +1,8 @@
 # Job Schedule
 
-## 项目介绍
+## Introduce
 
-### 1.目录结构
+### 1.Project Structure
 
 ```shell
 
@@ -26,7 +26,7 @@
    └─── 此文件是 docker-compose 的配置文件，主要包含 Redis 容器和 Rust 容器。
 ```
 
-### 2.部署方式
+### 2.Deploy
 
 1.git clone
 
