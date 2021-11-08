@@ -2,14 +2,14 @@
 
 ## 项目介绍
 
-### 目录结构
+### 1.目录结构
 
 ```shell
 
 ├─1.http_server
 │  │
 │  ├─main.rs
-│  └─── 此模块代码主要实现 server 端的各类业务操作：添加任务、修改任务、查询任务、删除任务      
+│  └─── 此模块代码主要实现 server 端的各类业务操作：添加任务、修改任务、查询任务、删除任务。      
 │        
 ├─2.scheduler
 │  │  
@@ -26,45 +26,88 @@
    └─── 此文件是 docker-compose 的配置文件，主要包含 Redis 容器和 Rust 容器。
 ```
 
-### 部署方式
+### 2.部署方式
+
+1.git clone
+
+> git clone git@github.com:luckychacha/job-scheduler.git
+
+2.checkout master branch
+
+> git checkout master
+
+3.docker-compose build
+
+> docker-compose build
+
+4.docker-compose up
+
+> docker-compose up -d
+
+5.If `docker-compose ps` has 2 containers(job-scheduler_rust_1 and redis) and `State` is `up`. Docker is ok.
+
+6.cargo build
+
+> 1. docker-compose exec rust bash
+> 
+> 2. check if `x86_64-unknown-linux-gnu` is installed: `rustup target list` 
+> 
+> 3. cd /var/www/myapp
+> 
+> 4. cargo build --release --all --target x86_64-unknown-linux-gnu
+> 
+> 5. start HTTP Server: `nohup target/x86_64-unknown-linux-gnu/release/http_server &`
+> 
+> 6. open another terminal and repeat step 1,3 and start Schedule: `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled.
+> 
+> 7. check if HTTP Server and Scheduler are started: `ps -ef|grep release`, if you see the output like this, deploy is finished.
+>
+
+``` shell
+
+root@01425bed986d:/var/www/myapp# ps -ef|grep release
+root      5983     6  0 16:47 pts/1    00:00:00 target/x86_64-unknown-linux-gnu/release/http_server
+root      6015  5992  0 17:44 pts/2    00:00:00 target/x86_64-unknown-linux-gnu/release/scheduler
+
+```
 
 
-
-### 接口调用
+### 3.接口调用
 
 ```shell
 
-# 1.添加任务，接口调用方式如下：
+# 1. into rust container： `docker-compose exec rust bash`.
+# 2. create a job:
 curl --location --request POST 'http://localhost:3000/api/jobs' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-  "content": "添加任务",
+  "content": "Add",
   "scheduleType": "Repeated",
   "duration": 5,
   "status": "RUNNING"
 }'
 
-# 2.添加接口返回内容【 json 格式】
+# 3. create interface response【 json 】,you can use the job id in response to query, update, delete job.
 {"content":"添加任务","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
 
 
-# 3.使用返回的 id 作为查询条件，调用查询接口。
+# 4. query a job by job id:
 curl --location --request GET 'http://localhost:3000/api/jobs/fc017bbb-465c-4cd0-95de-a63216e4fd85' \
 --header 'Content-Type: application/json'
 
-# 4.查询接口返回任务详情【 json 格式】
-{"content":"添加任务","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
+# 5. query interface response【 json 】
+{"content":"Add","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
 
-# 5.修改任务，接口调用方式如下：
+# 6. update a job by job id:
 curl --location --request PUT 'http://localhost:3000/api/jobs/fc017bbb-465c-4cd0-95de-a63216e4fd85' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-  "content": "修改任务",
+  "content": "Update",
   "scheduleType": "Repeated",
   "duration": 10
 }'
 
-# 6.删除任务，接口调用方式如下：
+# 7. delete a job by job id.
 curl --location --request DELETE 'http://localhost:3000/api/jobs/fc017bbb-465c-4cd0-95de-a63216e4fd85' \
 --data-raw ''
 
