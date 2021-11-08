@@ -1,11 +1,9 @@
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Local};
 use poem::{listener::TcpListener, Route};
 use poem_openapi::{
-    payload::Json, types::Password, ApiResponse, Object, OpenApi, OpenApiService, Tags,
+    payload::Json, ApiResponse, Object, OpenApi, OpenApiService,
 };
-use redis::{aio::ConnectionLike, AsyncCommands, Cmd};
 use slab::Slab;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -35,7 +33,7 @@ struct UpdateJob {
 
 #[derive(ApiResponse)]
 enum CreateJobResponse {
-    /// Returns when the user is successfully created.
+    /// Returns when the job is successfully created.
     #[oai(status = 200)]
     Ok(Json<Job>),
     #[oai(status = 500)]
@@ -44,30 +42,30 @@ enum CreateJobResponse {
 
 #[derive(ApiResponse)]
 enum FindJobResponse {
-    /// Return the specified user.
+    /// Return the specified job.
     #[oai(status = 200)]
     Ok(Json<Job>),
-    /// Return when the specified user is not found.
+    /// Return when the specified job is not found.
     #[oai(status = 404)]
     NotFound,
 }
 
 #[derive(ApiResponse)]
 enum DeleteJobResponse {
-    /// Returns when the user is successfully deleted.
+    /// Returns when the job is successfully deleted.
     #[oai(status = 200)]
     Ok,
-    /// Return when the specified user is not found.
+    /// Return when the specified job is not found.
     #[oai(status = 404)]
     NotFound,
 }
 
 #[derive(ApiResponse)]
 enum UpdateJobResponse {
-    /// Returns when the user is successfully updated.
+    /// Returns when the job is successfully updated.
     #[oai(status = 200)]
     Ok,
-    /// Return when the specified user is not found.
+    /// Return when the specified job is not found.
     #[oai(status = 404)]
     NotFound,
 }
@@ -95,16 +93,8 @@ impl Api {
     #[oai(path = "/jobs/:job_id", method = "get")]
     async fn index(
         &self,
-        #[oai(name = "job_id", in = "path")] job_id: String, // in="query" means this parameter is parsed from Url
+        #[oai(name = "job_id", in = "path")] job_id: String,
     ) -> FindJobResponse {
-        // PlainText is the response type, which means that the response type of the API is a string, and the Content-Type is `text/plain`
-        // let jobs = self.jobs.lock().await;
-        // match jobs.get(job_id as usize) {
-        //     Some(job) => {
-        //         FindJobResponse::Ok(Json(job.clone()))
-        //     },
-        //     None => FindJobResponse::NotFound,
-        // }
         match redis_hset_query(&job_id).await {
             Ok(job) => FindJobResponse::Ok(Json(job.clone())),
             Err(_) => FindJobResponse::NotFound,
@@ -117,11 +107,6 @@ impl Api {
         &self,
         #[oai(name = "job_id", in = "path")] job_id: String,
     ) -> DeleteJobResponse {
-        // let mut jobs = self.jobs.lock().await;
-        // let job_id = job_id as usize;
-        // if jobs.contains(job_id) {
-        //     jobs.remove(job_id);
-
         match self.index(job_id.clone()).await {
             FindJobResponse::Ok(_) => {
                 let _ = redis_delete(job_id, "running-list").await;
@@ -129,11 +114,6 @@ impl Api {
             },
             FindJobResponse::NotFound => DeleteJobResponse::NotFound,
         }
-        // let _ = redis_delete(job_id, "running-list").await;
-        // DeleteJobResponse::Ok
-        // } else {
-        //     DeleteJobResponse::NotFound
-        // }
     }
 
     /// Update job by id
@@ -143,18 +123,6 @@ impl Api {
         #[oai(name = "job_id", in = "path")] job_id: String,
         update: Json<UpdateJob>,
     ) -> UpdateJobResponse {
-        // let mut jobs = self.jobs.lock().await;
-        // match jobs.get_mut(job_id as usize) {
-        //     Some(job) => {
-        //         if let Some(content) = update.0.content {
-        //             job.content = content;
-        //         }
-        //         if let Some(schedule_type) = update.0.schedule_type {
-        //             job.schedule_type = schedule_type;
-        //         }
-        //         if let Some(duration) = update.0.duration {
-        //             job.duration = duration;
-        //         }
         match self.index(job_id).await {
             FindJobResponse::Ok(job) => {
                 let mut job = job.0;
@@ -179,7 +147,7 @@ impl Api {
 }
 
 async fn redis_hset_query(job_id: &str) -> redis::RedisResult<Job> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let res: BTreeMap<String, String> = redis::cmd("HGETALL")
@@ -197,7 +165,7 @@ async fn redis_hset_query(job_id: &str) -> redis::RedisResult<Job> {
 }
 
 async fn redis_add_task(job: &Job, list: &str) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let new_job = format!(
@@ -213,7 +181,7 @@ async fn redis_add_task(job: &Job, list: &str) -> redis::RedisResult<()> {
 }
 
 async fn redis_update(job: &Job, list: &str) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let new_job = format!(
@@ -230,7 +198,7 @@ async fn redis_update(job: &Job, list: &str) -> redis::RedisResult<()> {
 }
 
 async fn redis_delete(id: String, list: &str) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let delete_job = format!("{}|delete", id);

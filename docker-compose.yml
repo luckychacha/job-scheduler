@@ -2,8 +2,21 @@ version: "3.2"
 
 services:
   redis:
+    container_name: redis
     image: redis:alpine
     stdin_open: true
     tty: true
     ports:
       - 6379:6379
+  rust:
+    build: rust
+    working_dir: /var/www/myapp
+    stdin_open: true
+    tty: true
+    ports:
+      - 3000:3000
+    environment:
+      - CARGO_HOME=/var/www/myapp/.cargo
+    volumes:
+      - .:/var/www/myapp
+      - /etc/localtime:/etc/localtime

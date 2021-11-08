@@ -1,4 +1,4 @@
-use std::{process::exit, time::Duration};
+use std::time::Duration;
 
 use chrono::Local;
 use tokio::time;
@@ -20,12 +20,11 @@ async fn async_main() {
             get_task_interval.tick().await;
             async {
                 if let Ok(tasks) = get_todo_list_from_redis().await {
-                    add_tasks(tasks).await;
+                    let _ = add_tasks(tasks).await;
                 }
             }
             .await;
         }
-        // println!("next is");
     });
 
     tokio::spawn(async move {
@@ -36,7 +35,7 @@ async fn async_main() {
             get_update_task_interval.tick().await;
             async {
                 if let Ok(tasks) = get_running_list_from_redis().await {
-                    update_tasks(tasks).await;
+                    let _ = update_tasks(tasks).await;
                 }
             }
             .await;
@@ -46,7 +45,7 @@ async fn async_main() {
 }
 
 async fn get_todo_list_from_redis() -> redis::RedisResult<Vec<String>> {
-    let client = redis::Client::open("redis://127.0.0.1").unwrap();
+    let client = redis::Client::open("redis://redis").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let result: Vec<String> = redis::cmd("LRANGE")
@@ -67,7 +66,7 @@ async fn get_todo_list_from_redis() -> redis::RedisResult<Vec<String>> {
 }
 
 async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1").unwrap();
+    let client = redis::Client::open("redis://redis").unwrap();
     let mut con = client.get_async_connection().await?;
 
     for task in tasks {
@@ -120,7 +119,7 @@ async fn check_is_need_to_stop(id: &str) -> bool {
 }
 
 async fn get_job_status(id: &str) -> redis::RedisResult<String> {
-    let client = redis::Client::open("redis://127.0.0.1").unwrap();
+    let client = redis::Client::open("redis://redis").unwrap();
     let mut con = client.get_async_connection().await?;
     let result: String = redis::cmd("HGET")
         .arg(&[id, "status"])
@@ -130,7 +129,7 @@ async fn get_job_status(id: &str) -> redis::RedisResult<String> {
 }
 
 async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1").unwrap();
+    let client = redis::Client::open("redis://redis").unwrap();
     let mut con = client.get_async_connection().await?;
     for task in tasks {
         let (update_id, schedule_type, content) = parse_running_task(task);
@@ -158,7 +157,7 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
 }
 
 async fn get_running_list_from_redis() -> redis::RedisResult<Vec<String>> {
-    let client = redis::Client::open("redis://127.0.0.1").unwrap();
+    let client = redis::Client::open("redis://redis").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let result: Vec<String> = redis::cmd("LRANGE")
@@ -216,7 +215,6 @@ fn parse_running_task(task: String) -> (String, String, String) {
     let mut content = String::from("");
     // update / delete
     let mut schedule_type = String::from("");
-    let mut sec = 0;
 
     let _: Vec<&str> = task
         .split("|")
