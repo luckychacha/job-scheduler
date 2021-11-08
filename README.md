@@ -88,7 +88,7 @@ curl --location --request POST 'http://localhost:3000/api/jobs' \
 }'
 
 # 3. create interface response【 json 】,you can use the job id in response to query, update, delete job.
-{"content":"添加任务","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
+{"content":"Add","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
 
 
 # 4. query a job by job id:
