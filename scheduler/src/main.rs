@@ -4,6 +4,8 @@ use chrono::Local;
 use tokio::time;
 
 async fn async_main() {
+
+    // 创建一个永远不会结束的任务，保证 Scheduler 会一直运行。
     let start = tokio::spawn(async move {
         println!("Start");
         let mut init_interval = time::interval(Duration::from_secs(100));
@@ -12,6 +14,12 @@ async fn async_main() {
             init_interval.tick().await;
         }
     });
+
+    // 每 10 秒扫描一次 Todo-List，如果有新任务，通过 add_tasks 方法，将数据写入 HSET 中。
+    // 如果是循环任务，就根据 duration 设定一个 interval，并且进行循环，按时间间隔进行打印。
+    // 如果是仅一次的任务，就根据 duration 设定一个 sleep，延时打印。
+    // 由于时间关系，此处有一个可优化的点，就是每次运行时，可以记录当前的时间【 last tick 】以及执行的总次数【 ran times 】，
+    // 用他们可以发现任务未按时执行的情况，实现监控。
     tokio::spawn(async move {
         let mut get_task_interval = time::interval(Duration::from_secs(10));
         loop {
@@ -27,6 +35,11 @@ async fn async_main() {
         }
     });
 
+    // Running-List 用于处理修改和删除请求。
+    // 每 10 秒扫描一次 Running-List，如果有任务，通过 update_tasks 方法，
+    // 将任务的 status 改为 STOPPED，保证老任务不会输出。
+    // 如果是更新任务，就会把新的任务重新写入 Todo-List，让任务按照新的规则跑起来。
+    // 如果是删除任务，就会停止循环。
     tokio::spawn(async move {
         let mut get_update_task_interval = time::interval(Duration::from_secs(10));
         loop {
@@ -86,7 +99,9 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
         let _ = tokio::spawn(async move {
             if "OneShot" == schedule_type {
                 time::sleep(Duration::from_secs(duration)).await;
-                println!("  ****  id: {}, content: {}, type: {} now is {}  ****  ", id, content, schedule_type, now());
+                if !check_is_need_to_stop(&id).await {
+                    println!("  ****  id: {}, content: {}, type: {} now is {}  ****  ", id, content, schedule_type, now());
+                }
                 // stop_task(&id);
             } else if "Repeated" == schedule_type {
                 let mut interval = time::interval(Duration::from_secs(duration));
@@ -138,12 +153,6 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
 
         // 无论删除还是修改，都需要把任务停止
         stop_task(&update_id).await?;
-        // let _ = redis::cmd("HSET")
-        //     .arg(&update_id)
-        //     .arg("status")
-        //     .arg("STOPPED")
-        //     .query_async(&mut con)
-        //     .await?;
 
         if "update" == &schedule_type {
             let (_, content, schedule_type, sec, slab_idx) = parser_task(content);
