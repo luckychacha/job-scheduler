@@ -81,34 +81,33 @@ root      6015  5992  0 17:44 pts/2    00:00:00 target/x86_64-unknown-linux-gnu/
 curl --location --request POST 'http://localhost:3000/api/jobs' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-  "content": "Add",
+  "content": "Add a Job",
   "scheduleType": "Repeated",
-  "duration": 5,
-  "status": "RUNNING"
+  "duration": 5
 }'
 
 # 3. create interface response【 json 】,you can use the job id in response to query, update, delete job.
-{"content":"Add","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
+{"content":"Add a Job","duration":5,"id":"ab8bd2d2-fdcc-464d-b3fd-dfa341a3ccf5","scheduleType":"Repeated","status":"RUNNING"}
 
 
 # 4. query a job by job id:
-curl --location --request GET 'http://localhost:3000/api/jobs/fc017bbb-465c-4cd0-95de-a63216e4fd85' \
+curl --location --request GET 'http://localhost:3000/api/jobs/ab8bd2d2-fdcc-464d-b3fd-dfa341a3ccf5' \
 --header 'Content-Type: application/json'
 
 # 5. query interface response【 json 】
-{"content":"Add","duration":5,"id":"fc017bbb-465c-4cd0-95de-a63216e4fd85","scheduleType":"Repeated","status":"RUNNING"}
+{"content":"Add a Job","duration":5,"id":"ab8bd2d2-fdcc-464d-b3fd-dfa341a3ccf5","scheduleType":"Repeated","status":"RUNNING"}
 
 # 6. update a job by job id:
-curl --location --request PUT 'http://localhost:3000/api/jobs/fc017bbb-465c-4cd0-95de-a63216e4fd85' \
+curl --location --request PUT 'http://localhost:3000/api/jobs/ab8bd2d2-fdcc-464d-b3fd-dfa341a3ccf5' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-  "content": "Update",
+  "content": "Update the job",
   "scheduleType": "Repeated",
   "duration": 10
 }'
 
-# 7. delete a job by job id.
-curl --location --request DELETE 'http://localhost:3000/api/jobs/fc017bbb-465c-4cd0-95de-a63216e4fd85' \
+# 7. delete a job by job id:
+curl --location --request DELETE 'http://localhost:3000/api/jobs/ab8bd2d2-fdcc-464d-b3fd-dfa341a3ccf5' \
 --data-raw ''
 
 ```

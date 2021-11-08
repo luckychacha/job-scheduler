@@ -20,6 +20,7 @@ struct Job {
 
     duration: i64,
 
+    #[oai(read_only)]
     status: String,
 }
 
@@ -78,11 +79,17 @@ struct Api {
 #[OpenApi]
 impl Api {
     #[oai(path = "/jobs", method = "post")]
-    async fn create_user(&self, job: Json<Job>) -> CreateJobResponse {
+    async fn create_job(&self, job: Json<Job>) -> CreateJobResponse {
         let mut job = job.0;
         job.id = Uuid::new_v4().to_string();
         job.status = String::from("RUNNING");
-        let res = redis_add_task(&job, "todo-list").await;
+
+        // Save jobs into slab. It is a demo so if use RDB is too big.
+        // It can also changed to save a record in RDB such as MySQL.  
+        let mut jobs = self.jobs.lock().await;
+        let idx = jobs.insert(job.clone()) as i64;
+
+        let res = redis_add_task(&job, "todo-list", idx).await;
 
         match res {
             Ok(_) => CreateJobResponse::Ok(Json(job)),
@@ -96,57 +103,87 @@ impl Api {
         #[oai(name = "job_id", in = "path")] job_id: String,
     ) -> FindJobResponse {
         match redis_hset_query(&job_id).await {
-            Ok(job) => FindJobResponse::Ok(Json(job.clone())),
+            Ok((job, slab_idx)) => FindJobResponse::Ok(Json(job.clone())),
             Err(_) => FindJobResponse::NotFound,
         }
     }
 
     /// Delete job by id
     #[oai(path = "/jobs/:job_id", method = "delete")]
-    async fn delete_user(
+    async fn delete_job(
         &self,
         #[oai(name = "job_id", in = "path")] job_id: String,
     ) -> DeleteJobResponse {
-        match self.index(job_id.clone()).await {
-            FindJobResponse::Ok(_) => {
-                let _ = redis_delete(job_id, "running-list").await;
-                DeleteJobResponse::Ok
+        match redis_hset_query(&job_id).await {
+            Ok((_, slab_idx)) => {
+                let mut jobs = self.jobs.lock().await;
+                if jobs.contains(slab_idx as usize) {
+                    // remove from slab
+                    jobs.remove(slab_idx as usize);
+
+                    // update cache
+                    let _ = redis_delete(job_id, "running-list").await;
+                    DeleteJobResponse::Ok
+                } else {
+                    DeleteJobResponse::NotFound
+                }
             },
-            FindJobResponse::NotFound => DeleteJobResponse::NotFound,
+            Err(_) => DeleteJobResponse::NotFound,
         }
+
+
+        // match self.index(job_id.clone()).await {
+        //     FindJobResponse::Ok(_) => {
+        //         let _ = redis_delete(job_id, "running-list").await;
+        //         DeleteJobResponse::Ok
+        //     },
+        //     FindJobResponse::NotFound => DeleteJobResponse::NotFound,
+        // }
     }
 
     /// Update job by id
     #[oai(path = "/jobs/:job_id", method = "put")]
-    async fn put_user(
+    async fn put_job(
         &self,
         #[oai(name = "job_id", in = "path")] job_id: String,
         update: Json<UpdateJob>,
     ) -> UpdateJobResponse {
-        match self.index(job_id).await {
-            FindJobResponse::Ok(job) => {
-                let mut job = job.0;
-                if let Some(content) = update.0.content {
-                    job.content = content;
-                }
-                if let Some(schedule_type) = update.0.schedule_type {
-                    job.schedule_type = schedule_type;
-                }
-                if let Some(duration) = update.0.duration {
-                    job.duration = duration;
-                }
-                let _ = redis_update(&job, "running-list").await;
-                UpdateJobResponse::Ok
-            },
-            FindJobResponse::NotFound => UpdateJobResponse::NotFound,
-        }
+        match redis_hset_query(&job_id).await {
+            Ok((job, slab_idx)) => {
+                
+                let mut jobs = self.jobs.lock().await;
+                match jobs.get_mut(slab_idx as usize) {
+                    Some(slab_job) => {
+                        
+                        let mut job = job;
+                        if let Some(content) = update.0.content {
+                            job.content = content.clone();
+                            slab_job.content = content;
+                        }
+                        if let Some(schedule_type) = update.0.schedule_type {
+                            job.schedule_type = schedule_type.clone();
+                            slab_job.schedule_type = schedule_type;
 
-            // }
-            // None => 
+                        }
+                        if let Some(duration) = update.0.duration {
+                            job.duration = duration;
+                            slab_job.duration = duration;
+                        }
+                        let _ = redis_update(&job, "running-list", slab_idx).await;
+                        UpdateJobResponse::Ok
+                    },
+                    None => UpdateJobResponse::NotFound,
+                }
+                // } else {
+                //     UpdateJobResponse::NotFound
+                // }
+            },
+            Err(_) => UpdateJobResponse::NotFound,
+        }
     }
 }
 
-async fn redis_hset_query(job_id: &str) -> redis::RedisResult<Job> {
+async fn redis_hset_query(job_id: &str) -> redis::RedisResult<(Job, i64)> {
     let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
@@ -161,16 +198,17 @@ async fn redis_hset_query(job_id: &str) -> redis::RedisResult<Job> {
         duration: res.get("duration").unwrap().parse::<i64>().unwrap(),
         status: res.get("status").unwrap().clone(),
     };
-    Ok(job)
+    let slab_idx = res.get("slab_idx").unwrap().parse::<i64>().unwrap();
+    Ok((job, slab_idx))
 }
 
-async fn redis_add_task(job: &Job, list: &str) -> redis::RedisResult<()> {
+async fn redis_add_task(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
     let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let new_job = format!(
-        "{}::{}::{}::{}",
-        job.id, job.content, job.schedule_type, job.duration
+        "{}::{}::{}::{}::{}",
+        job.id, job.content, job.schedule_type, job.duration, idx
     );
     let _ = redis::cmd("RPUSH")
         .arg(&[list, &new_job])
@@ -180,13 +218,13 @@ async fn redis_add_task(job: &Job, list: &str) -> redis::RedisResult<()> {
     Ok(())
 }
 
-async fn redis_update(job: &Job, list: &str) -> redis::RedisResult<()> {
+async fn redis_update(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
     let client = redis::Client::open("redis://redis/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let new_job = format!(
-        "{}::{}::{}::{}",
-        job.id, job.content, job.schedule_type, job.duration
+        "{}::{}::{}::{}::{}",
+        job.id, job.content, job.schedule_type, job.duration, idx
     );
     let update_job = format!("{}|update|{}", job.id, new_job);
     let _ = redis::cmd("RPUSH")

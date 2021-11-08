@@ -70,7 +70,7 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
     let mut con = client.get_async_connection().await?;
 
     for task in tasks {
-        let (id, content, schedule_type, duration) = parser_task(task);
+        let (id, content, schedule_type, duration, slab_idx) = parser_task(task);
 
         let _ = redis::cmd("HMSET")
             .arg(&(id))
@@ -79,13 +79,15 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
             .arg(&["schedule_type", &schedule_type])
             .arg(&["duration", &duration.to_string()])
             .arg(&["status", "RUNNING"])
+            .arg(&["slab_idx", &slab_idx.to_string()])
             .query_async(&mut con)
             .await?;
 
         let _ = tokio::spawn(async move {
             if "OneShot" == schedule_type {
                 time::sleep(Duration::from_secs(duration)).await;
-                println!("id: {}, content: {}, type: {} now is {}", id, content, schedule_type, now());
+                println!("  ****  id: {}, content: {}, type: {} now is {}  ****  ", id, content, schedule_type, now());
+                // stop_task(&id);
             } else if "Repeated" == schedule_type {
                 let mut interval = time::interval(Duration::from_secs(duration));
                 loop {
@@ -94,7 +96,7 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
                         break;
                     }
                     async {
-                        println!("id: {}, content: {}, type: {}, now is {}", id, content, schedule_type, now());
+                        println!("  ****  id: {}, content: {}, type: {}, now is {}  ****  ", id, content, schedule_type, now());
                     }
                     .await;
                 }
@@ -135,17 +137,18 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
         let (update_id, schedule_type, content) = parse_running_task(task);
 
         // 无论删除还是修改，都需要把任务停止
-        let _ = redis::cmd("HSET")
-            .arg(&update_id)
-            .arg("status")
-            .arg("STOPPED")
-            .query_async(&mut con)
-            .await?;
+        stop_task(&update_id).await?;
+        // let _ = redis::cmd("HSET")
+        //     .arg(&update_id)
+        //     .arg("status")
+        //     .arg("STOPPED")
+        //     .query_async(&mut con)
+        //     .await?;
 
         if "update" == &schedule_type {
-            let (_, content, schedule_type, sec) = parser_task(content);
+            let (_, content, schedule_type, sec, slab_idx) = parser_task(content);
 
-            let new_job = format!("{}::{}::{}::{}", update_id, content, schedule_type, sec);
+            let new_job = format!("{}::{}::{}::{}::{}", update_id, content, schedule_type, sec, slab_idx);
 
             let _ = redis::cmd("RPUSH")
                 .arg(&["todo-list", &new_job])
@@ -153,6 +156,20 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
                 .await?;
         }
     }
+    Ok(())
+}
+
+async fn stop_task(id: &str) -> redis::RedisResult<()> {
+    let client = redis::Client::open("redis://redis").unwrap();
+    let mut con = client.get_async_connection().await?;
+
+    let _ = redis::cmd("HSET")
+    .arg(&id)
+    .arg("status")
+    .arg("STOPPED")
+    .query_async(&mut con)
+    .await?;
+
     Ok(())
 }
 
@@ -187,11 +204,12 @@ fn now() -> String {
     Local::now().format(fmt).to_string()
 }
 
-fn parser_task(task: String) -> (String, String, String, u64) {
+fn parser_task(task: String) -> (String, String, String, u64, i64) {
     let mut id = String::from("");
     let mut content = String::from("");
     let mut schedule_type = String::from("");
     let mut duration = 0;
+    let mut slab_idx = 0;
     let _: Vec<&str> = task
         .split("::")
         .enumerate()
@@ -201,12 +219,13 @@ fn parser_task(task: String) -> (String, String, String, u64) {
                 1 => content = String::from(item),
                 2 => schedule_type = String::from(item),
                 3 => duration = item.parse::<u64>().unwrap(),
+                4 => slab_idx = item.parse::<i64>().unwrap(),
                 _ => {}
             }
             ""
         })
         .collect();
-    (id, content, schedule_type, duration)
+    (id, content, schedule_type, duration, slab_idx)
 }
 
 fn parse_running_task(task: String) -> (String, String, String) {
