@@ -28,33 +28,33 @@
 
 ### 2.Deploy
 
-1.git clone
+1. git clone
 
 > git clone git@github.com:luckychacha/job-scheduler.git
 
-2.checkout master branch
+2. checkout master branch
 
 > git checkout master
 
-3.docker-compose build
+3. docker-compose build
 
 > docker-compose build
 
-4.docker-compose up
+4. docker-compose up
 
 > docker-compose up -d
 
-5.If `docker-compose ps` has 2 containers(job-scheduler_rust_1 and redis) and `State` is `up`. Docker is ok.
+5. If `docker-compose ps` has 2 containers(job-scheduler_rust_1 and redis) and `State` is `up`. Docker is ok.
 
-6.cargo build
+6. cargo build in docker
 
-> 1. docker-compose exec rust bash
+> 1. `docker-compose exec rust bash`
 > 
 > 2. check if `x86_64-unknown-linux-gnu` is installed: `rustup target list` 
 > 
-> 3. cd /var/www/myapp
+> 3. `cd /var/www/myapp`
 > 
-> 4. cargo build --release --all --target x86_64-unknown-linux-gnu
+> 4. `cargo build --release --all --target x86_64-unknown-linux-gnu`
 > 
 > 5. start HTTP Server: `nohup target/x86_64-unknown-linux-gnu/release/http_server &`
 > 
