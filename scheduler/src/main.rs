@@ -4,48 +4,31 @@ use chrono::Local;
 use tokio::time;
 
 async fn async_main() {
-    // 创建一个永远不会结束的任务，保证 Scheduler 会一直运行。
-    let start = tokio::spawn(async move {
-        println!("Start");
-        let mut init_interval = time::interval(Duration::from_secs(100));
 
-        loop {
-            init_interval.tick().await;
-        }
-    });
-
-    // 每 10 秒扫描一次 Todo-List，如果有新任务，通过 add_tasks 方法，将数据写入 HSET 中。
+    // 每 10 秒扫描一次
+    // Todo-List，如果有新任务，通过 add_tasks 方法，将数据写入 HSET 中。
     // 如果是循环任务，就根据 duration 设定一个 interval，并且进行循环，按时间间隔进行打印。
     // 如果是仅一次的任务，就根据 duration 设定一个 sleep，延时打印。
     // 由于时间关系，此处有一个可优化的点，就是每次运行时，可以记录当前的时间【 last tick 】以及执行的总次数【 ran times 】，
     // 用他们可以发现任务未按时执行的情况，实现监控。
-    tokio::spawn(async move {
-        let mut get_task_interval = time::interval(Duration::from_secs(10));
-        loop {
-            println!("Start scan tasks in todo-list! now is {}", now());
-
-            get_task_interval.tick().await;
-            async {
-                if let Ok(tasks) = get_todo_list_from_redis().await {
-                    let _ = add_tasks(tasks).await;
-                }
-            }
-            .await;
-        }
-    });
-
     // Running-List 用于处理修改和删除请求。
-    // 每 10 秒扫描一次 Running-List，如果有任务，通过 update_tasks 方法，
     // 将任务的 status 改为 STOPPED，保证老任务不会输出。
     // 如果是更新任务，就会把新的任务重新写入 Todo-List，让任务按照新的规则跑起来。
     // 如果是删除任务，就会停止循环。
-    tokio::spawn(async move {
-        let mut get_update_task_interval = time::interval(Duration::from_secs(10));
+    let main = tokio::spawn(async move {
+        let mut get_task_interval = time::interval(Duration::from_secs(10));
         loop {
-            println!("Start scan tasks in running-list! now is {}", now());
 
-            get_update_task_interval.tick().await;
+            get_task_interval.tick().await;
             async {
+                println!("Start scan tasks in todo-list! now is {}", now());
+
+                if let Ok(tasks) = get_todo_list_from_redis().await {
+                    let _ = add_tasks(tasks).await;
+                }
+
+                println!("Start scan tasks in running-list! now is {}", now());
+
                 if let Ok(tasks) = get_running_list_from_redis().await {
                     let _ = update_tasks(tasks).await;
                 }
@@ -53,11 +36,11 @@ async fn async_main() {
             .await;
         }
     });
-    let _ = start.await;
+    let _ = main.await;
 }
 
 async fn get_todo_list_from_redis() -> redis::RedisResult<Vec<String>> {
-    let client = redis::Client::open("redis://redis").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let result: Vec<String> = redis::cmd("LRANGE")
@@ -78,7 +61,7 @@ async fn get_todo_list_from_redis() -> redis::RedisResult<Vec<String>> {
 }
 
 async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://redis").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1").unwrap();
     let mut con = client.get_async_connection().await?;
 
     for task in tasks {
@@ -147,7 +130,7 @@ async fn check_is_need_to_stop(id: &str) -> bool {
 }
 
 async fn get_job_status(id: &str) -> redis::RedisResult<String> {
-    let client = redis::Client::open("redis://redis").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1").unwrap();
     let mut con = client.get_async_connection().await?;
     let result: String = redis::cmd("HGET")
         .arg(&[id, "status"])
@@ -157,7 +140,7 @@ async fn get_job_status(id: &str) -> redis::RedisResult<String> {
 }
 
 async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://redis").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1").unwrap();
     let mut con = client.get_async_connection().await?;
     for task in tasks {
         let (update_id, schedule_type, content) = parse_running_task(task);
@@ -183,7 +166,7 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
 }
 
 async fn stop_task(id: &str) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://redis").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let _ = redis::cmd("HSET")
@@ -197,7 +180,7 @@ async fn stop_task(id: &str) -> redis::RedisResult<()> {
 }
 
 async fn get_running_list_from_redis() -> redis::RedisResult<Vec<String>> {
-    let client = redis::Client::open("redis://redis").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let result: Vec<String> = redis::cmd("LRANGE")

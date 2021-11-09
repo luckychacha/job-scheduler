@@ -199,7 +199,7 @@ impl Api {
 }
 
 async fn redis_hset_query(job_id: &str) -> redis::RedisResult<(Job, i64)> {
-    let client = redis::Client::open("redis://redis/").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let cache_query = redis::cmd("HGETALL")
@@ -224,7 +224,7 @@ async fn redis_hset_query(job_id: &str) -> redis::RedisResult<(Job, i64)> {
 }
 
 async fn redis_add_task(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://redis/").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let new_job = format!(
@@ -240,7 +240,7 @@ async fn redis_add_task(job: &Job, list: &str, idx: i64) -> redis::RedisResult<(
 }
 
 async fn redis_update(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://redis/").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let new_job = format!(
@@ -257,7 +257,7 @@ async fn redis_update(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()>
 }
 
 async fn redis_delete(id: String, list: &str) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://redis/").unwrap();
+    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_async_connection().await?;
 
     let delete_job = format!("{}|delete", id);
