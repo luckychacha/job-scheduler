@@ -1359,7 +1359,12 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "poem",
+ "poem-openapi",
  "redis",
+ "serde",
+ "serde_json",
+ "slab",
  "tokio",
  "tracing",
  "tracing-subscriber",
