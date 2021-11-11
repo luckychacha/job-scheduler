@@ -8,6 +8,46 @@ use tokio::task::JoinHandle;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use mobc_redis::redis::AsyncCommands;
+use mobc_redis::mobc;
+use mobc_redis::redis;
+use mobc_redis::RedisConnectionManager;
+
+pub type Connection = mobc::Connection<RedisConnectionManager>;
+
+#[derive(Clone)]
+pub struct RedisPool {
+    pub pool: mobc::Pool<RedisConnectionManager>,
+}
+
+impl Default for RedisPool {
+    fn default() -> Self {
+        let redis = redis::Client::open("redis://127.0.0.1").unwrap();
+        let mgr = RedisConnectionManager::new(redis);
+        let pool = mobc::Pool::builder().max_open(20).build(mgr);
+        Self { pool }
+    }
+}
+
+impl RedisPool {
+    pub fn new() -> Option<Self> {
+        match redis::Client::open("redis://127.0.0.1") {
+            Ok(it) => {
+                let mgr = RedisConnectionManager::new(it);
+                let pool = mobc::Pool::builder().max_open(20).build(mgr);
+                Some(Self { pool })
+            },
+            Err(_) => return None,
+        }
+    }
+
+    pub async fn get_connection(&self) -> Option<Connection> {
+        match self.pool.get().await {
+            Ok(it) => Some(it),
+            Err(_) => return None,
+        }
+    }
+}
 
 pub async fn http_server_start() -> JoinHandle<Result<(), Error>> {
     
@@ -95,9 +135,11 @@ enum UpdateJobResponse {
     NotFound,
 }
 
+
 #[derive(Default)]
 struct Api {
     jobs: Mutex<Slab<Job>>,
+    redis_pool: RedisPool,
 }
 
 #[OpenApi]
@@ -124,7 +166,7 @@ impl Api {
         let mut jobs = self.jobs.lock().await;
         let idx = jobs.insert(job.clone()) as i64;
 
-        let res = redis_add_task(&job, "todo-list", idx).await;
+        let res = self.redis_add_task(&job, "todo-list", idx).await;
 
         match res {
             Ok(_) => CreateJobResponse::Ok(Json(job)),
@@ -137,7 +179,7 @@ impl Api {
     // 通过 任务ID 到 Redis 中的 HSET 查找，如果找到返回任务信息，否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "get")]
     async fn index(&self, #[oai(name = "job_id", in = "path")] job_id: String) -> FindJobResponse {
-        match redis_hset_query(&job_id).await {
+        match self.redis_hset_query(&job_id).await {
             Ok((job, slab_idx)) => FindJobResponse::Ok(Json(job.clone())),
             Err(_) => FindJobResponse::NotFound,
         }
@@ -154,7 +196,7 @@ impl Api {
         &self,
         #[oai(name = "job_id", in = "path")] job_id: String,
     ) -> DeleteJobResponse {
-        match redis_hset_query(&job_id).await {
+        match self.redis_hset_query(&job_id).await {
             Ok((_, slab_idx)) => {
                 let mut jobs = self.jobs.lock().await;
                 if jobs.contains(slab_idx as usize) {
@@ -162,7 +204,7 @@ impl Api {
                     jobs.remove(slab_idx as usize);
 
                     // update cache
-                    let _ = redis_delete(job_id, "running-list").await;
+                    let _ = self.redis_delete(job_id, "running-list").await;
                     DeleteJobResponse::Ok
                 } else {
                     DeleteJobResponse::NotFound
@@ -184,7 +226,7 @@ impl Api {
         #[oai(name = "job_id", in = "path")] job_id: String,
         update: Json<UpdateJob>,
     ) -> UpdateJobResponse {
-        match redis_hset_query(&job_id).await {
+        match self.redis_hset_query(&job_id).await {
             Ok((job, slab_idx)) => {
                 let mut jobs = self.jobs.lock().await;
                 match jobs.get_mut(slab_idx as usize) {
@@ -202,7 +244,7 @@ impl Api {
                             job.duration = duration;
                             slab_job.duration = duration;
                         }
-                        let _ = redis_update(&job, "running-list", slab_idx).await;
+                        let _ = self.redis_update(&job, "running-list", slab_idx).await;
                         UpdateJobResponse::Ok
                     }
                     None => UpdateJobResponse::NotFound,
@@ -214,75 +256,92 @@ impl Api {
             Err(_) => UpdateJobResponse::NotFound,
         }
     }
-}
 
-async fn redis_hset_query(job_id: &str) -> redis::RedisResult<(Job, i64)> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let mut con = client.get_async_connection().await?;
+    async fn redis_add_task(&self, job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
+        // let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+        // let mut con = client.get_async_connection().await?;
 
-    let cache_query = redis::cmd("HGETALL")
-        .arg(job_id)
-        .query_async(&mut con)
-        .await;
-    match cache_query {
-        Ok(res) => {
-            let res: BTreeMap<String, String> = res;
-            let job: Job = Job {
-                id: res.get("id").unwrap().clone(),
-                content: res.get("content").unwrap().clone(),
-                schedule_type: res.get("schedule_type").unwrap().clone(),
-                duration: res.get("duration").unwrap().parse::<i64>().unwrap(),
-                status: res.get("status").unwrap().clone(),
-            };
-            let slab_idx = res.get("slab_idx").unwrap().parse::<i64>().unwrap();
-            Ok((job, slab_idx))
-        }
-        Err(error) => Err(error),
+
+        let new_job = format!(
+            "{}::{}::{}::{}::{}",
+            job.id, job.content, job.schedule_type, job.duration, idx
+        );
+        let mut con = self.redis_pool.clone().get_connection().await.unwrap();
+        let _ = con.rpush(list, new_job).await?;
+        // let _ = con.rpush(list, new_job).await?;
+        // let _ = redis::cmd("RPUSH")
+        //     .arg(&[list, &new_job])
+        //     .query_async(&mut con)
+        //     .await?;
+
+        Ok(())
     }
-}
 
-async fn redis_add_task(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let mut con = client.get_async_connection().await?;
+    async fn redis_hset_query(&self, job_id: &str) -> redis::RedisResult<(Job, i64)> {
+        // let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+        // let mut con = client.get_async_connection().await?;
+        let mut con = self.redis_pool.clone().get_connection().await.unwrap();
+        let cache_query = con.hget(job_id, vec![
+            "id",
+            "content",
+            "schedule_type",
+            "duration",
+            "status",
+            "slab_idx",
+        ]).await;
+        // let cache_query = redis::cmd("HGETALL")
+        //     .arg(job_id)
+        //     .query_async(&mut con)
+        //     .await;
+        match cache_query {
+            Ok(res) => {
+                let res: BTreeMap<String, String> = res;
+                let job: Job = Job {
+                    id: res.get("id").unwrap().clone(),
+                    content: res.get("content").unwrap().clone(),
+                    schedule_type: res.get("schedule_type").unwrap().clone(),
+                    duration: res.get("duration").unwrap().parse::<i64>().unwrap(),
+                    status: res.get("status").unwrap().clone(),
+                };
+                let slab_idx = res.get("slab_idx").unwrap().parse::<i64>().unwrap();
+                Ok((job, slab_idx))
+            }
+            Err(error) => Err(error),
+        }
+    }
 
-    let new_job = format!(
-        "{}::{}::{}::{}::{}",
-        job.id, job.content, job.schedule_type, job.duration, idx
-    );
-    let _ = redis::cmd("RPUSH")
-        .arg(&[list, &new_job])
-        .query_async(&mut con)
-        .await?;
+    async fn redis_update(&self, job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
+        // let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+        // let mut con = client.get_async_connection().await?;
+        let mut con = self.redis_pool.clone().get_connection().await.unwrap();
+        
+        let new_job = format!(
+            "{}::{}::{}::{}::{}",
+            job.id, job.content, job.schedule_type, job.duration, idx
+        );
+        let update_job = format!("{}|update|{}", job.id, new_job);
+        // let _ = redis::cmd("RPUSH")
+        //     .arg(&[list, &update_job])
+        //     .query_async(&mut con)
+        //     .await?;
+        let _ = con.rpush(list, update_job).await?;
 
-    Ok(())
-}
+        Ok(())
+    }
 
-async fn redis_update(job: &Job, list: &str, idx: i64) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let mut con = client.get_async_connection().await?;
+    async fn redis_delete(&self, id: String, list: &str) -> redis::RedisResult<()> {
+        let mut con = self.redis_pool.clone().get_connection().await.unwrap();
+        
+        // let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+        // let mut con = client.get_async_connection().await?;
 
-    let new_job = format!(
-        "{}::{}::{}::{}::{}",
-        job.id, job.content, job.schedule_type, job.duration, idx
-    );
-    let update_job = format!("{}|update|{}", job.id, new_job);
-    let _ = redis::cmd("RPUSH")
-        .arg(&[list, &update_job])
-        .query_async(&mut con)
-        .await?;
+        let delete_job = format!("{}|delete", id);
+        // let _ = redis::cmd("RPUSH")
+        //     .arg(&[list, &delete_job])
+        //     .query_async(&mut con)
+        //     .await?;
+        let _ = con.rpush(list, delete_job).await?;
 
-    Ok(())
-}
-
-async fn redis_delete(id: String, list: &str) -> redis::RedisResult<()> {
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let mut con = client.get_async_connection().await?;
-
-    let delete_job = format!("{}|delete", id);
-    let _ = redis::cmd("RPUSH")
-        .arg(&[list, &delete_job])
-        .query_async(&mut con)
-        .await?;
-
-    Ok(())
+        Ok(())
+    }
 }
