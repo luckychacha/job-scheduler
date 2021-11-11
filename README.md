@@ -6,7 +6,7 @@
 
 ```shell
 
-├─1.http_server
+├─1.http_server【已废弃，合并到 scheduler 模块中】
 │  │
 │  ├─main.rs
 │  └─── 此模块代码主要实现 server 端的各类业务操作：添加任务、修改任务、查询任务、删除任务。      
@@ -14,7 +14,7 @@
 ├─2.scheduler
 │  │  
 │  ├─main.rs
-│  └─── 此模块代码主要实现任务调度。 
+│  └─── 此模块代码主要实现任务调度 和 HTTP Server。 
 │
 ├─3.rust
 │  │  
@@ -54,19 +54,18 @@
 > 
 > 3. `cd /var/www/myapp`
 > 
-> 4. `cargo build --release --all --target x86_64-unknown-linux-gnu`
+> 4. `cd /var/www/myapp/scheduler` and `cargo build --release --target x86_64-unknown-linux-gnu`
 > 
-> 5. start HTTP Server: `nohup target/x86_64-unknown-linux-gnu/release/http_server &`
+> ~~ 5. start HTTP Server: `nohup target/x86_64-unknown-linux-gnu/release/http_server &` ~~
 > 
 > 6. open another terminal and repeat step 1,3 and start Schedule: `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this. ![scheduler-running-log-describe](./scheduler-running-log-describe.png)
 > 
-> 7. check if HTTP Server and Scheduler are started: `ps -ef|grep release`, if you see the output like this, deploy is finished.
+> 7. check if ~~ HTTP Server and ~~ Scheduler are started: `ps -ef|grep release`, if you see the output like this, deploy is finished.
 >
 
 ``` shell
 
 root@01425bed986d:/var/www/myapp# ps -ef|grep release
-root      5983     6  0 16:47 pts/1    00:00:00 target/x86_64-unknown-linux-gnu/release/http_server
 root      6015  5992  0 17:44 pts/2    00:00:00 target/x86_64-unknown-linux-gnu/release/scheduler
 
 ```
@@ -76,7 +75,7 @@ root      6015  5992  0 17:44 pts/2    00:00:00 target/x86_64-unknown-linux-gnu/
 
 ```shell
 
-# 1. into rust container： `docker-compose exec rust bash`.
+# 1. Go into rust container： `docker-compose exec rust bash`.
 # 2. create a job:
 curl --location --request POST 'http://localhost:3000/api/jobs' \
 --header 'Content-Type: application/json' \
