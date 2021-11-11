@@ -117,7 +117,6 @@ async fn add_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisRes
                 let mut interval = time::interval(Duration::from_secs(duration));
                 loop {
                     interval.tick().await;
-                    // if check_is_need_to_stop_a(&id, redis_pool.clone()).await {
                     if check_is_need_to_stop(&id, redis_pool.clone()).await {
                         break;
                     }
@@ -152,20 +151,6 @@ async fn check_is_need_to_stop(id: &str, redis_pool: RedisPool) -> bool {
     }
 }
 
-// async fn check_is_need_to_stop(id: &str) -> bool {
-//     let job_status = get_job_status(id).await;
-
-//     match job_status {
-//         Ok(job_status) => {
-//             if "RUNNING" == &job_status {
-//                 return false;
-//             }
-//             true
-//         }
-//         Err(_) => true,
-//     }
-// }
-
 async fn get_job_status(id: &str, redis_pool: RedisPool) -> redis::RedisResult<String> {
     let mut con = redis_pool.clone().get_connection().await.unwrap();
 
@@ -195,20 +180,6 @@ async fn update_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::Redis
     }
     Ok(())
 }
-
-// async fn stop_task(id: &str, redis_pool: RedisPool) -> redis::RedisResult<()> {
-//     let client = redis::Client::open("redis://redis").unwrap();
-//     let mut con = client.get_async_connection().await?;
-
-//     let _ = redis::cmd("HSET")
-//         .arg(id)
-//         .arg("status")
-//         .arg("STOPPED")
-//         .query_async(&mut con)
-//         .await?;
-
-//     Ok(())
-// }
 
 async fn get_running_list_from_redis(redis_pool: RedisPool) -> redis::RedisResult<Vec<String>> {
     let mut con = redis_pool.clone().get_connection().await.unwrap();
