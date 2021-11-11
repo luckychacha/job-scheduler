@@ -1,7 +1,7 @@
-use std::io::Error;
-use std::time::Duration;
 use chrono::Local;
 use mobc_redis::redis::AsyncCommands;
+use std::io::Error;
+use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time;
 
@@ -23,7 +23,7 @@ impl RedisPool {
                 let mgr = RedisConnectionManager::new(it);
                 let pool = mobc::Pool::builder().max_open(20).build(mgr);
                 Some(Self { pool })
-            },
+            }
             Err(_) => return None,
         }
     }
@@ -52,7 +52,6 @@ pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
     tokio::spawn(async move {
         let mut get_task_interval = time::interval(Duration::from_secs(10));
         loop {
-
             get_task_interval.tick().await;
             async {
                 println!("Start scan tasks in todo-list! now is {}", now());
@@ -72,7 +71,6 @@ pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
     })
 }
 
-
 async fn get_todo_list_from_redis(redis_pool: RedisPool) -> redis::RedisResult<Vec<String>> {
     let mut con = redis_pool.clone().get_connection().await.unwrap();
     let result = con.lrange("todo-list", 0, -1).await.unwrap();
@@ -88,7 +86,6 @@ async fn get_todo_list_from_redis(redis_pool: RedisPool) -> redis::RedisResult<V
 }
 
 async fn add_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisResult<()> {
-
     for task in tasks {
         let redis_pool = redis_pool.clone();
         let mut con = redis_pool.clone().get_connection().await.unwrap();
@@ -105,7 +102,6 @@ async fn add_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisRes
         ];
         let _ = con.hset_multiple(id.clone(), params).await?;
         let _ = tokio::spawn(async move {
-
             if "OneShot" == schedule_type {
                 time::sleep(Duration::from_secs(duration)).await;
                 if !check_is_need_to_stop(&id, redis_pool.clone()).await {
@@ -141,7 +137,6 @@ async fn add_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisRes
     }
     Ok(())
 }
-
 
 async fn check_is_need_to_stop(id: &str, redis_pool: RedisPool) -> bool {
     let job_status = get_job_status(id, redis_pool.clone()).await;
@@ -225,11 +220,9 @@ async fn get_running_list_from_redis(redis_pool: RedisPool) -> redis::RedisResul
 
         let mut con = redis_pool.clone().get_connection().await.unwrap();
         let _ = con.lpop("running-list").await?;
-
     }
     Ok(result)
 }
-
 
 fn now() -> String {
     let fmt = "%Y-%m-%d %H:%M:%S";
