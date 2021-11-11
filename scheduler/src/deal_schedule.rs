@@ -18,7 +18,7 @@ pub struct RedisPool {
 
 impl RedisPool {
     pub fn new() -> Option<Self> {
-        match redis::Client::open("redis://127.0.0.1") {
+        match redis::Client::open("redis://redis") {
             Ok(it) => {
                 let mgr = RedisConnectionManager::new(it);
                 let pool = mobc::Pool::builder().max_open(20).build(mgr);
@@ -197,7 +197,7 @@ async fn update_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::Redis
 }
 
 // async fn stop_task(id: &str, redis_pool: RedisPool) -> redis::RedisResult<()> {
-//     let client = redis::Client::open("redis://127.0.0.1").unwrap();
+//     let client = redis::Client::open("redis://redis").unwrap();
 //     let mut con = client.get_async_connection().await?;
 
 //     let _ = redis::cmd("HSET")
