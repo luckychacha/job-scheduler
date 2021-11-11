@@ -49,7 +49,6 @@ impl RedisPool {
 pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
     let redis_pool = RedisPool::new().unwrap();
 
-    // let conn = redis_pool.get_connection().await.unwrap();
     tokio::spawn(async move {
         let mut get_task_interval = time::interval(Duration::from_secs(10));
         loop {
@@ -75,13 +74,7 @@ pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
 
 
 async fn get_todo_list_from_redis(redis_pool: RedisPool) -> redis::RedisResult<Vec<String>> {
-    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let mut con = client.get_async_connection().await.unwrap();
     let mut con = redis_pool.clone().get_connection().await.unwrap();
-    // let result: Vec<String> = redis::cmd("LRANGE")
-    //     .arg(&["todo-list", "0", "-1"])
-    //     .query_async(&mut con)
-    //     .await?;
     let result = con.lrange("todo-list", 0, -1).await.unwrap();
 
     //RPUSH -> LPOP remove tasks from todo list[todo-list]
@@ -90,16 +83,11 @@ async fn get_todo_list_from_redis(redis_pool: RedisPool) -> redis::RedisResult<V
         let mut con = redis_pool.clone().get_connection().await.unwrap();
 
         let _ = con.lpop("todo-list").await?;
-        // let _ = redis::cmd("LPOP")
-        //     .arg(&["todo-list"])
-        //     .query_async(&mut con)
-        //     .await?;
     }
     Ok(result)
 }
 
 async fn add_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisResult<()> {
-    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
 
     for task in tasks {
         let redis_pool = redis_pool.clone();
@@ -116,16 +104,6 @@ async fn add_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisRes
             ("slab_idx", &slab_idx.to_string()),
         ];
         let _ = con.hset_multiple(id.clone(), params).await?;
-        // let _ = redis::cmd("HMSET")
-        //     .arg(&(id))
-        //     .arg(&["id", &id])
-        //     .arg(&["content", &content])
-        //     .arg(&["schedule_type", &schedule_type])
-        //     .arg(&["duration", &duration.to_string()])
-        //     .arg(&["status", "RUNNING"])
-        //     .arg(&["slab_idx", &slab_idx.to_string()])
-        //     .query_async(&mut con)
-        //     .await?;
         let _ = tokio::spawn(async move {
 
             if "OneShot" == schedule_type {
@@ -194,21 +172,13 @@ async fn check_is_need_to_stop(id: &str, redis_pool: RedisPool) -> bool {
 // }
 
 async fn get_job_status(id: &str, redis_pool: RedisPool) -> redis::RedisResult<String> {
-    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let mut con = client.get_async_connection().await?;
     let mut con = redis_pool.clone().get_connection().await.unwrap();
 
     let result: String = con.hget(id, "status").await?;
-    // let result: String = redis::cmd("HGET")
-    //     .arg(&[id, "status"])
-    //     .query_async(&mut con)
-    //     .await?;
     Ok(result)
 }
 
 async fn update_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::RedisResult<()> {
-    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let mut con = client.get_async_connection().await?;
     for task in tasks {
         let redis_pool = redis_pool.clone();
         let mut con = redis_pool.get_connection().await.unwrap();
@@ -216,7 +186,6 @@ async fn update_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::Redis
 
         // 无论删除还是修改，都需要把任务停止
         let _ = con.hset(&update_id, "status", "STOPPED").await?;
-        // stop_task(&update_id, redis_pool).await?;
 
         if "update" == &schedule_type {
             let (_, content, schedule_type, sec, slab_idx) = parser_task(content);
@@ -227,10 +196,6 @@ async fn update_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::Redis
             );
 
             let _ = con.rpush("todo-list", &new_job).await?;
-            // let _ = redis::cmd("RPUSH")
-            //     .arg(&["todo-list", &new_job])
-            //     .query_async(&mut con)
-            //     .await?;
         }
     }
     Ok(())
@@ -251,14 +216,8 @@ async fn update_tasks(tasks: Vec<String>, redis_pool: RedisPool) -> redis::Redis
 // }
 
 async fn get_running_list_from_redis(redis_pool: RedisPool) -> redis::RedisResult<Vec<String>> {
-    // let client = redis::Client::open("redis://127.0.0.1").unwrap();
-    // let mut con = client.get_async_connection().await?;
     let mut con = redis_pool.clone().get_connection().await.unwrap();
     let result: Vec<String> = con.lrange("running-list", 0, -1).await?;
-    // let result: Vec<String> = redis::cmd("LRANGE")
-    //     .arg(&["running-list", "0", "-1"])
-    //     .query_async(&mut con)
-    //     .await?;
 
     //RPUSH -> LPOP remove tasks from running list[running-list]
     for task in &result {
@@ -267,10 +226,6 @@ async fn get_running_list_from_redis(redis_pool: RedisPool) -> redis::RedisResul
         let mut con = redis_pool.clone().get_connection().await.unwrap();
         let _ = con.lpop("running-list").await?;
 
-        // let _ = redis::cmd("LPOP")
-        //     .arg(&["running-list"])
-        //     .query_async(&mut con)
-        //     .await?;
     }
     Ok(result)
 }
