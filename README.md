@@ -5,23 +5,18 @@
 ### 1.Project Structure
 
 ```shell
-
-├─1.http_server【已废弃，合并到 scheduler 模块中】
-│  │
-│  ├─main.rs
-│  └─── 此模块代码主要实现 server 端的各类业务操作：添加任务、修改任务、查询任务、删除任务。      
-│        
-├─2.scheduler
+     
+├─1.scheduler
 │  │  
 │  ├─main.rs
-│  └─── 此模块代码主要实现任务调度 和 HTTP Server。 
+│  └─── 此模块代码主要实现任务调度 和 用于和用户交互的 HTTP Server。 
 │
-├─3.rust
+├─2.rust
 │  │  
 │  ├─Dockerfile
 │  └─── 此目录存放的是 Rust 的容器的构建步骤，docker-compose 的一部分。        
 │         
-└─4.docker-compose.yml
+└─3.docker-compose.yml
    │     
    └─── 此文件是 docker-compose 的配置文件，主要包含 Redis 容器和 Rust 容器。
 ```
@@ -56,7 +51,7 @@
 > 
 > 4. `cd /var/www/myapp/scheduler` and `cargo build --release --target x86_64-unknown-linux-gnu`
 > 
-> 5. open another terminal and repeat step 1,3 and start scheduler: `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this. ![scheduler-running-log-describe](./scheduler-running-log-describe.png)
+> 5. open another terminal and repeat step 1,3, start scheduler: RUST_LOG=INFO `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this. ![scheduler-running-log-describe](./scheduler-running-log-describe.png) If you want to see all debug logs, you can use change RUST_LOG value from INFO to DEBUG, INFO and DEBUG logs will be printed.
 > 
 > 6. check if scheduler process is started: `ps -ef|grep release`, if you see the output like this, deploy is finished.
 >
