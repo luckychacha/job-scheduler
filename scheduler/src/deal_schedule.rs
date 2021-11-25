@@ -58,6 +58,7 @@ async fn get_todo_list_from_redis() -> redis::RedisResult<Vec<String>> {
     Ok(result)
 }
 
+#[instrument(level = "info")]
 async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
     for task in tasks {
         let (id, content, schedule_type, duration, slab_idx) = parser_task(task);
@@ -150,6 +151,7 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
     Ok(())
 }
 
+#[instrument(level = "debug")]
 async fn get_running_list_from_redis() -> redis::RedisResult<Vec<String>> {
     let result: Vec<String> = connection().await.lrange("running-list", 0, -1).await?;
 
