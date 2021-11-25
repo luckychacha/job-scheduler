@@ -13,42 +13,6 @@ use mobc_redis::redis::AsyncCommands;
 
 use crate::connection;
 
-// pub type Connection = mobc::Connection<RedisConnectionManager>;
-
-// #[derive(Clone)]
-// pub struct RedisPool {
-//     pub pool: mobc::Pool<RedisConnectionManager>,
-// }
-
-// impl Default for RedisPool {
-//     fn default() -> Self {
-//         let redis = redis::Client::open("redis://127.0.0.1").unwrap();
-//         let mgr = RedisConnectionManager::new(redis);
-//         let pool = mobc::Pool::builder().max_open(20).build(mgr);
-//         Self { pool }
-//     }
-// }
-
-// impl RedisPool {
-//     pub fn new() -> Option<Self> {
-//         match redis::Client::open("redis://127.0.0.1") {
-//             Ok(it) => {
-//                 let mgr = RedisConnectionManager::new(it);
-//                 let pool = mobc::Pool::builder().max_open(20).build(mgr);
-//                 Some(Self { pool })
-//             }
-//             Err(_) => return None,
-//         }
-//     }
-
-//     pub async fn get_connection(&self) -> Option<Connection> {
-//         match self.pool.get().await {
-//             Ok(it) => Some(it),
-//             Err(_) => return None,
-//         }
-//     }
-// }
-
 pub async fn http_server_start() -> JoinHandle<Result<(), Error>> {
     tokio::spawn(async move {
         // Create a TCP listener
@@ -255,7 +219,6 @@ impl Api {
             "{}::{}::{}::{}::{}",
             job.id, job.content, job.schedule_type, job.duration, idx
         );
-        // let mut con = connection().await.unwrap();
         let _ = connection().await.rpush(list, new_job).await?;
         Ok(())
     }
