@@ -51,7 +51,7 @@
 > 
 > 4. `cd /var/www/myapp/scheduler` and `cargo build --release --target x86_64-unknown-linux-gnu`
 > 
-> 5. open another terminal and repeat step 1,3, start scheduler: RUST_LOG=INFO `target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this. ![scheduler-running-log-describe](./scheduler-running-log-describe.png) If you want to see all debug logs, you can use change RUST_LOG value from INFO to DEBUG, INFO and DEBUG logs will be printed.
+> 5. open another terminal and repeat step 1,3, start scheduler: `RUST_LOG=INFO target/x86_64-unknown-linux-gnu/release/scheduler`, keep it open and you can see how jobs scheduled, logs like this. ![scheduler-running-log-describe](./scheduler-running-log-describe.png) If you want to see all debug logs, you can use change RUST_LOG level from INFO to DEBUG, INFO and DEBUG logs will be printed.
 > 
 > 6. check if scheduler process is started: `ps -ef|grep release`, if you see the output like this, deploy is finished.
 >
