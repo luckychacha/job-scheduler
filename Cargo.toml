@@ -9,6 +9,5 @@ edition = "2021"
 
 [workspace]
 members = [
-    "http_server",
     "scheduler",
 ]

@@ -890,23 +890,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "http_server"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "poem",
- "poem-openapi",
- "redis 0.21.4",
- "serde",
- "serde_json",
- "slab",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "httparse"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
