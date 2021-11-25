@@ -24,7 +24,6 @@ use crate::connection;
 // 如果是删除任务，就会停止循环。
 #[instrument(level = "debug")]
 pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
-    // let redis_pool = RedisPool::new().unwrap();
 
     tokio::spawn(async move {
         let mut get_task_interval = time::interval(Duration::from_secs(10));
