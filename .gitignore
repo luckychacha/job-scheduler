@@ -1,3 +1,4 @@
 /target
 .cargo
 nohup.out
+.idea
