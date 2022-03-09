@@ -104,17 +104,6 @@ struct Api {
 
 #[OpenApi]
 impl Api {
-    // 创建任务：
-    // 接口接收由 3 个参数组成的 Json 格式对象：
-    // content【 任务内容 】
-    // schedule_type【 任务类型：可重复执行：Repeated / 仅一次：OneShot】
-    // duration【 可重复执行任务时，此参数为循环的时间间隔，仅一次的任务时，此参数为多久后执行 】
-    // 组装数据，为任务生成 id【 uuid 】，以及初始运行状态【 status：RUNNING 】，加上提交的三个参数生成 Job 对象。
-    // 存储：将对象参数存入 slab 中，这个流程用于模拟数据库操作。
-    // 此处因为是 demo，未使用 RDB 这类重型的组件，例如 MySQL，
-    // 后期改造为使用 RDB 如 MySQL 后可以在 Scheduler 中新建一个任务，定时从数据库中查询应执行的任务，
-    // 并且在 Redis 中进行检查，如果不存在就可以进行启动。
-    // 缓存：将存入 slab 返回的 key 以及 Job 对象调用 redis_add_task 方法，写入 Redis 中的 Todo-List 中。
     #[oai(path = "/jobs", method = "post")]
     async fn create_job(&self, job: Json<Job>) -> CreateJobResponse {
         let mut job = job.0;
@@ -134,9 +123,6 @@ impl Api {
         }
     }
 
-    // 查询任务：
-    // 接口接收 1 个参数：任务ID【 uuid 】
-    // 通过 任务ID 到 Redis 中的 HSET 查找，如果找到返回任务信息，否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "get")]
     async fn index(&self, #[oai(name = "job_id", in = "path")] job_id: String) -> FindJobResponse {
         match self.redis_hset_query(&job_id).await {
@@ -145,12 +131,6 @@ impl Api {
         }
     }
 
-    // 删除任务：
-    // 接口接收 1 个参数：任务ID【 uuid 】
-    // 通过 任务ID 到 Redis 中的 HSET 查找，
-    // 如果找到，就把从 hset 中拿到 slab_idx，根据 slab_id 移除元素，用于模拟数据库的删除操作【物理删除或者逻辑删除】
-    // slab 处理完成后，将数据按照 job_id|delete 的格式写入 Running-List
-    // 否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "delete")]
     async fn delete_job(
         &self,
@@ -174,12 +154,6 @@ impl Api {
         }
     }
 
-    // 修改任务：
-    // 接口接收 1 个参数：任务ID【 uuid 】，和一个 PUT 传递过来的包含任务内容，任务类型，任务时间三个参数组成的 UpdateJob 对象。
-    // 通过 任务ID 到 Redis 中的 HSET 查找，
-    // 如果找到，就把从 hset 中拿到 slab_idx，根据 slab_id 从更新元素，用于模拟数据库的更新操作
-    // slab 处理完成后，将数据按照 job_id|update|id::content::schedule_type::duration::idx 的格式写入 Running-List
-    // 否则返回 404.
     #[oai(path = "/jobs/:job_id", method = "put")]
     async fn put_job(
         &self,

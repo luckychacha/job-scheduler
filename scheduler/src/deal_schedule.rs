@@ -12,16 +12,6 @@ use tracing::{debug, info, instrument};
 use crate::connection;
 
 
-// 每 10 秒扫描一次
-// Todo-List，如果有新任务，通过 add_tasks 方法，将数据写入 HSET 中。
-// 如果是循环任务，就根据 duration 设定一个 interval，并且进行循环，按时间间隔进行打印。
-// 如果是仅一次的任务，就根据 duration 设定一个 sleep，延时打印。
-// 由于时间关系，此处有一个可优化的点，就是每次运行时，可以记录当前的时间【 last tick 】以及执行的总次数【 ran times 】，
-// 用他们可以发现任务未按时执行的情况，实现监控。
-// Running-List 用于处理修改和删除请求。
-// 将任务的 status 改为 STOPPED，保证老任务不会输出。
-// 如果是更新任务，就会把新的任务重新写入 Todo-List，让任务按照新的规则跑起来。
-// 如果是删除任务，就会停止循环。
 #[instrument(level = "debug")]
 pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
 
@@ -131,7 +121,6 @@ async fn update_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
     for task in tasks {
         let (update_id, schedule_type, content) = parse_running_task(task);
 
-        // 无论删除还是修改，都需要把任务停止
         let _ = connection()
             .await
             .hset(&update_id, "status", "STOPPED")
@@ -195,7 +184,6 @@ fn parser_task(task: String) -> (String, String, String, u64, i64) {
 
 fn parse_running_task(task: String) -> (String, String, String) {
     let mut update_id = String::from("");
-    // ""
     let mut content = String::from("");
     // update / delete
     let mut schedule_type = String::from("");

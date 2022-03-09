@@ -9,16 +9,16 @@
 ├─1.scheduler
 │  │  
 │  ├─main.rs
-│  └─── 此模块代码主要实现任务调度 和 用于和用户交互的 HTTP Server。 
+│  └─── Job scheduler and Web Server code. 
 │
 ├─2.rust
 │  │  
 │  ├─Dockerfile
-│  └─── 此目录存放的是 Rust 的容器的构建步骤，docker-compose 的一部分。        
+│  └─── Rust docker container.        
 │         
 └─3.docker-compose.yml
    │     
-   └─── 此文件是 docker-compose 的配置文件，主要包含 Redis 容器和 Rust 容器。
+   └─── Docker compose file, include Rust container and Redis container.
 ```
 
 ### 2.Deploy
