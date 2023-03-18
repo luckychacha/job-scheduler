@@ -1,10 +1,10 @@
 mod deal_schedule;
 mod server;
 
-use mobc_redis::redis;
-use mobc_redis::mobc;
-use mobc_redis::RedisConnectionManager;
 use lazy_static::lazy_static;
+use mobc_redis::mobc;
+use mobc_redis::redis;
+use mobc_redis::RedisConnectionManager;
 
 lazy_static! {
     static ref REDIS_POOL: RedisPool = RedisPool::new().unwrap();
@@ -23,7 +23,7 @@ pub struct RedisPool {
 
 impl RedisPool {
     pub fn new() -> Option<Self> {
-        match redis::Client::open("redis://redis") {
+        match redis::Client::open("redis://127.0.0.1") {
             Ok(it) => {
                 let mgr = RedisConnectionManager::new(it);
                 let pool = mobc::Pool::builder().max_open(20).build(mgr);

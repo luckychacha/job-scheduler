@@ -1,6 +1,6 @@
 use chrono::Local;
-use std::io::Error;
 use std::time::Duration;
+use std::{collections::HashMap, io::Error};
 use tokio::task::JoinHandle;
 use tokio::time;
 
@@ -11,10 +11,20 @@ use tracing::{debug, info, instrument};
 
 use crate::connection;
 
+struct Task {
+    id: String,
+    handle: JoinHandle<()>,
+}
+
+impl Task {
+    fn new(id: String, handle: JoinHandle<()>) -> Self {
+        Task { id, handle }
+    }
+}
 
 #[instrument(level = "debug")]
 pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
-
+    let mut all_tasks: HashMap<String, Task> = HashMap::new();
     tokio::spawn(async move {
         let mut get_task_interval = time::interval(Duration::from_secs(10));
         loop {
@@ -23,7 +33,10 @@ pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
                 debug!("Start scan tasks in todo-list! now is {}", now());
 
                 if let Ok(tasks) = get_todo_list_from_redis().await {
-                    let _ = add_tasks(tasks).await;
+                    let batch_new_tasks = add_tasks(tasks).await;
+                    if let Ok(new_tasks) = batch_new_tasks {
+                        all_tasks.extend(new_tasks);
+                    }
                 }
                 debug!("Start scan tasks in running-list! now is {}", now());
 
@@ -49,7 +62,8 @@ async fn get_todo_list_from_redis() -> redis::RedisResult<Vec<String>> {
 }
 
 #[instrument(level = "info")]
-async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
+async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<HashMap<String, Task>> {
+    let mut tmp: HashMap<String, Task> = HashMap::new();
     for task in tasks {
         let (id, content, schedule_type, duration, slab_idx) = parser_task(task);
 
@@ -62,7 +76,9 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
             ("slab_idx", &slab_idx.to_string()),
         ];
         let _ = connection().await.hset_multiple(id.clone(), params).await?;
-        let _ = tokio::spawn(async move {
+        let task_id = id.clone();
+
+        let handle = tokio::spawn(async move {
             if "OneShot" == schedule_type {
                 time::sleep(Duration::from_secs(duration)).await;
                 if !check_is_need_to_stop(&id).await {
@@ -94,8 +110,9 @@ async fn add_tasks(tasks: Vec<String>) -> redis::RedisResult<()> {
                 }
             }
         });
+        tmp.insert(task_id.clone(), Task::new(task_id.clone(), handle));
     }
-    Ok(())
+    Ok(tmp)
 }
 
 async fn check_is_need_to_stop(id: &str) -> bool {
