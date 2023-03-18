@@ -23,13 +23,16 @@ pub struct RedisPool {
 
 impl RedisPool {
     pub fn new() -> Option<Self> {
-        match redis::Client::open("redis://127.0.0.1") {
+        match redis::Client::open("redis://127.0.0.1/") {
             Ok(it) => {
                 let mgr = RedisConnectionManager::new(it);
                 let pool = mobc::Pool::builder().max_open(20).build(mgr);
                 Some(Self { pool })
             }
-            Err(_) => return None,
+            Err(e) => {
+                println!("{e:?}");
+                return None;
+            }
         }
     }
 

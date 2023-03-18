@@ -36,6 +36,13 @@ pub async fn schedule_start() -> JoinHandle<Result<(), Error>> {
                     let batch_new_tasks = add_tasks(tasks).await;
                     if let Ok(new_tasks) = batch_new_tasks {
                         all_tasks.extend(new_tasks);
+
+                        if all_tasks.len() > 5 {
+                            all_tasks.keys().for_each(|key| {
+                                let stop_item = all_tasks.get(key).unwrap();
+                                stop_item.handle.abort();
+                            })
+                        }
                     }
                 }
                 debug!("Start scan tasks in running-list! now is {}", now());
